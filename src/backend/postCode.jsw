@@ -1,0 +1,21 @@
+//   AIzaSyCOxcwMDaKL7eqMRe7ggzAarV5AS_ZaIAM
+import { fetch } from 'wix-fetch';
+var res;
+
+export function getLat(zipCode) {
+    var webhook = 'https://maps.googleapis.com/maps/api/geocode/json?address=' + zipCode + '&key=AIzaSyChMXTYsNnYwy63M9rMgrgtr8pnYOTkTU8&region=UK';
+
+    fetch(webhook)
+        .then(response => response.json())
+        .then(data => {
+            console.log("data", data.results[0].geometry.location.lat);
+            res = data;
+        })
+    setTimeout(() => {
+
+        if (res.results[0].geometry.location.lat) {
+            return res;
+        }
+    }, 1000);
+
+}

@@ -1,0 +1,118 @@
+import wixData from "wix-data";
+import { fetch } from 'wix-fetch';
+
+export async function getTailorNearMe(filterOpts, postalId) {
+    const { lat: lat1, lng: lng1, error} = await getLatLng(postalId);
+
+    let query = wixData.query("News");
+    
+    if( filterOpts.clothingItems.length > 0 ) {
+        query = query.hasSome("clothingItems", filterOpts.clothingItems);
+    }
+
+    let { items } = await query.limit(999).find();
+
+    items = items.map(itemData=>{
+        const { lat: lat2, lng: lng2 } = getTailorLatLng(itemData);
+        const coords1 = { latitude: lat1, longitude:  lng1 };
+        const coords2 = { latitude: lat2, longitude: lng2 };
+        // console.log({ geolib })
+        const isNearBy = isWithinRadius(coords1, coords2, 25_000);
+        const kms = calculateDistance(coords1, coords2);
+        const miles = kms / 1609
+
+        return {
+            ...itemData,
+            isNearBy,
+            kms,
+            miles
+        }
+    }).sort((a,b)=>a.distance-b.distance)
+
+    let itemMapMiles = {};
+    for( const { _id, miles} of items ) {
+    itemMapMiles[_id] = miles
+    }
+
+    return { items, itemMapMiles, hasError: !!error };
+}
+
+function getTailorLatLng(itemData) {
+    return { lat:  itemData.address.location.latitude, lng: itemData.address.location.longitude }
+}
+
+async function getLatLng(postalId) {
+    let url = `https://maps.googleapis.com/maps/api/geocode/json?address=${postalId}&key=AIzaSyChMXTYsNnYwy63M9rMgrgtr8pnYOTkTU8&region=UK`;
+
+    const res = await fetch(url);
+    const json = await res.json();
+    if( json.status !== "OK") return { error: "Failed", json}
+    console.log(json.results[0])
+    const  {lat, lng} = json.results[0].geometry.location;
+
+    return { lat , lng}
+}
+
+
+function isWithinRadius(loc1, loc2, radius) {
+    const { lat: lat1, lng: lng1 } = loc1;
+    const { lat: lat2, lng: lng2 } = loc2; 
+    // Convert latitude and longitude from degrees to radians
+    const lat1Rad = toRadians(lat1);
+    const lon1Rad = toRadians(lng1);
+    const lat2Rad = toRadians(lat2);
+    const lon2Rad = toRadians(lng2);
+
+    // Calculate the distance using Haversine formula
+    const dlat = lat2Rad - lat1Rad;
+    const dlon = lon2Rad - lon1Rad;
+    const a =
+        Math.sin(dlat / 2) * Math.sin(dlat / 2) +
+        Math.cos(lat1Rad) * Math.cos(lat2Rad) * Math.sin(dlon / 2) * Math.sin(dlon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+    // Radius of the Earth in kilometers (you can adjust this value)
+    const earthRadius = 6371;
+
+    // Calculate the distance in kilometers
+    const distance = earthRadius * c;
+
+    // Check if the distance is within the specified radius
+    return distance <= radius;
+}
+
+function calculateDistance(loc1, loc2) {
+  const { lat: lat1, lng: lon1 } = loc1;
+  const { lat: lat2, lng: lon2 } = loc2;
+
+  // Convert latitude and longitude from degrees to radians
+  const lat1Rad = toRadians(lat1);
+  const lon1Rad = toRadians(lon1);
+  const lat2Rad = toRadians(lat2);
+  const lon2Rad = toRadians(lon2);
+
+  // Calculate the distance using Haversine formula
+  const dlat = lat2Rad - lat1Rad;
+  const dlon = lon2Rad - lon1Rad;
+  const a =
+    Math.sin(dlat / 2) * Math.sin(dlat / 2) +
+    Math.cos(lat1Rad) * Math.cos(lat2Rad) * Math.sin(dlon / 2) * Math.sin(dlon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+  // Radius of the Earth in kilometers
+  const earthRadius = 6371;
+
+  // Calculate the distance in kilometers
+  const distance = earthRadius * c;
+
+  return distance;
+}
+
+function toRadians(degrees) {
+    return degrees * (Math.PI / 180);
+}
+
+// var check = geolib.isPointWithinRadius({ latitude: itemData.address.location.latitude, longitude: itemData.address.location.longitude }, { latitude: res.results[0].geometry.location.lat, longitude: res.results[0].geometry.location.lng },
+//     25000
+// );
+// var distance = getDistance({ latitude: itemData.address.location.latitude, longitude: itemData.address.location.longitude }, { latitude: res.results[0].geometry.location.lat, longitude: res.results[0].geometry.location.lng });

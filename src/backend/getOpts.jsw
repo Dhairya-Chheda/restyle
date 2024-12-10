@@ -1,0 +1,33 @@
+import wixData from "wix-data";
+
+export async function getOpts() {
+    let item = [], material = [], needed = [], typesOfServicesTags = [];
+    try {
+        const query = wixData.query("News").limit(100);
+
+        const [
+            clothingItemsUnique,
+            materialsUnique,
+            jobTypeUnique,
+            typesOfServicesTagsUnique
+        ] = await Promise.all([
+            query.ascending("clothingItems").distinct("clothingItems"),
+            query.ascending("materials").distinct("materials"),
+            query.ascending("jobType").distinct("jobType"),
+            query.ascending("typesOfServicesTags").distinct("typesOfServicesTags"),
+        ]);
+
+        const toOpts = res => res.items.map(value =>({ label: value, value }));
+        
+        item = toOpts(clothingItemsUnique)
+        material = toOpts(materialsUnique)
+        needed = toOpts(jobTypeUnique)
+        typesOfServicesTags = toOpts(typesOfServicesTagsUnique)
+
+        return { item, material, needed, typesOfServicesTags }
+    }
+    catch(e) {
+        console.error(e);
+        return { item, material, needed, typesOfServicesTags };
+    }
+}
